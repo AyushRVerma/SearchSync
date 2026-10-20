@@ -1,0 +1,172 @@
+# ==============================================================================
+# Git Ignore Configuration
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Environment & Secret Configuration Files
+# ------------------------------------------------------------------------------
+.env
+.env.*
+*.env
+# Ensure template/example files are not ignored
+!.env.example
+!.env.template
+
+# Spring Boot sensitive / local environment configuration overrides
+src/main/resources/application-local.properties
+src/main/resources/application-local.yml
+src/main/resources/application-local.yaml
+src/main/resources/application-secret.properties
+src/main/resources/application-secret.yml
+src/main/resources/application-secret.yaml
+src/main/resources/application-private.properties
+src/main/resources/application-private.yml
+src/main/resources/application-private.yaml
+application-local.properties
+application-local.yml
+application-local.yaml
+application-secret.properties
+application-secret.yml
+application-secret.yaml
+application-*.local.properties
+application-*.local.yml
+application-*.local.yaml
+
+# ------------------------------------------------------------------------------
+# 2. Private Keys, Keystores, & Certificates
+# ------------------------------------------------------------------------------
+*.pem
+*.key
+*.pkcs12
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.crt
+*.der
+*.asc
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+id_ecdsa
+id_ecdsa.pub
+
+# Dedicated secret / credential directories
+secrets/
+private/
+credentials/
+.secrets/
+
+# ------------------------------------------------------------------------------
+# 3. Cloud & Service Account Credentials / Tokens
+# ------------------------------------------------------------------------------
+*credentials*.json
+*secret*.json
+service-account*.json
+gcp-*.json
+google-credentials*.json
+firebase-adminsdk*.json
+*.token
+token.json
+.aws/
+.azure/
+.gcp/
+
+# ------------------------------------------------------------------------------
+# 4. Docker & Compose Local Overrides
+# ------------------------------------------------------------------------------
+docker-compose.override.yml
+docker-compose.override.yaml
+compose.override.yml
+compose.override.yaml
+
+# ------------------------------------------------------------------------------
+# 5. Build Artifacts & Dependency Caches (Maven / Java)
+# ------------------------------------------------------------------------------
+target/
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+*.zip
+*.tar.gz
+*.rar
+
+# Local repository caches
+.m2/
+.gradle/
+build/
+
+# Maven release plugin files
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# ------------------------------------------------------------------------------
+# 6. IDEs & Editors
+# ------------------------------------------------------------------------------
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# Eclipse
+.classpath
+.project
+.settings/
+
+# Sublime Text / NetBeans
+*.sublime-project
+*.sublime-workspace
+nbproject/
+nb-configuration.xml
+
+# Vim / Emacs swap and backup files
+*.swp
+*.swo
+*~
+.#*
+
+# ------------------------------------------------------------------------------
+# 7. Operating System Files
+# ------------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# ------------------------------------------------------------------------------
+# 8. Logs & Crash Dumps
+# ------------------------------------------------------------------------------
+*.log
+logs/
+*.hprof
+hs_err_pid*
+replay_pid*
+
+# ------------------------------------------------------------------------------
+# 9. Temporary Files & Scratch Dirs
+# ------------------------------------------------------------------------------
+*.tmp
+*.temp
+tmp/
+temp/

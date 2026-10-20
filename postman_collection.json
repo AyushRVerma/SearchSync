@@ -1,0 +1,527 @@
+{
+  "info": {
+    "name": "Near-Real-Time Search & CDC Pipeline",
+    "description": "Complete test suite for the PostgreSQL CDC -> Kafka -> Elasticsearch pipeline, covering CRUD, Search, CDC verification, Admin Reindexing, DLT inspection, and Metrics.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "productId",
+      "value": ""
+    },
+    {
+      "key": "productVersion",
+      "value": "0"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 - Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/actuator/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["actuator", "health"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is UP', function () {",
+              "    pm.response.to.have.status(200);",
+              "    pm.expect(pm.response.json().status).to.eql('UP');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - Create Product (Write Path)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"sku\": \"PHONE-15-TITANIUM\",\n  \"title\": \"iPhone 15 Pro Titanium\",\n  \"description\": \"A flagship smartphone with grade 5 titanium frame and A17 chip.\",\n  \"category\": \"Electronics\",\n  \"price\": 999.99,\n  \"stockQuantity\": 15,\n  \"active\": true\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/products",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "products"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Product Created (201)', function () {",
+              "    pm.response.to.have.status(201);",
+              "    var data = pm.response.json();",
+              "    pm.expect(data.id).to.not.be.null;",
+              "    pm.collectionVariables.set('productId', data.id);",
+              "    pm.collectionVariables.set('productVersion', data.version);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 - Get Product By ID (Postgres Read)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/products/{{productId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "products", "{{productId}}"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Product details match', function () {",
+              "    pm.response.to.have.status(200);",
+              "    var data = pm.response.json();",
+              "    pm.expect(data.sku).to.eql('PHONE-15-TITANIUM');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 - Search: Typo Tolerance (CDC to Elasticsearch)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/search?q=iphne",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "search"],
+          "query": [
+            {
+              "key": "q",
+              "value": "iphne",
+              "description": "Misspelled query to test fuzziness"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Found misspelled item', function () {",
+              "    pm.response.to.have.status(200);",
+              "    var data = pm.response.json();",
+              "    pm.expect(data.total).to.be.above(0);",
+              "    var match = data.items.some(item => item.sku === 'PHONE-15-TITANIUM');",
+              "    pm.expect(match).to.be.true;",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 - Search: Autocomplete (Edge-NGram)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/search?q=iph",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "search"],
+          "query": [
+            {
+              "key": "q",
+              "value": "iph",
+              "description": "Prefix query to test edge_ngram autocomplete"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Autocomplete matches prefix', function () {",
+              "    pm.response.to.have.status(200);",
+              "    var data = pm.response.json();",
+              "    pm.expect(data.total).to.be.above(0);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 - Search: Facets & Aggregations",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/search?category=Electronics&available=true&minPrice=500&maxPrice=1500&sort=PRICE_ASC&includeFacets=true",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "search"],
+          "query": [
+            {
+              "key": "category",
+              "value": "Electronics"
+            },
+            {
+              "key": "available",
+              "value": "true"
+            },
+            {
+              "key": "minPrice",
+              "value": "500"
+            },
+            {
+              "key": "maxPrice",
+              "value": "1500"
+            },
+            {
+              "key": "sort",
+              "value": "PRICE_ASC"
+            },
+            {
+              "key": "includeFacets",
+              "value": "true"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Facets returned correctly', function () {",
+              "    pm.response.to.have.status(200);",
+              "    var data = pm.response.json();",
+              "    pm.expect(data.facets).to.not.be.null;",
+              "    pm.expect(data.facets.categories).to.have.property('electronics');",
+              "    pm.expect(data.facets.priceStats.min).to.be.at.least(500);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 - Patch Product (Update Price & Clear Description)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"price\": 949.99,\n  \"description\": null,\n  \"version\": {{productVersion}}\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/products/{{productId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "products", "{{productId}}"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Product patched and version incremented', function () {",
+              "    pm.response.to.have.status(200);",
+              "    var data = pm.response.json();",
+              "    pm.expect(data.price).to.eql(949.99);",
+              "    pm.expect(data.description).to.be.null;",
+              "    pm.collectionVariables.set('productVersion', data.version);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 - Test Optimistic Lock Conflict (409 Conflict)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"price\": 899.99,\n  \"version\": 0\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/products/{{productId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "products", "{{productId}}"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Returns 409 Conflict on stale version', function () {",
+              "    pm.response.to.have.status(409);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 - Delete Product (Hard Delete)",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/products/{{productId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "products", "{{productId}}"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Product deleted (204)', function () {",
+              "    pm.response.to.have.status(204);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 - Verify Delete in Search (Tombstone Propagation)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/search?q=PHONE-15-TITANIUM",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "search"],
+          "query": [
+            {
+              "key": "q",
+              "value": "PHONE-15-TITANIUM"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Deleted item is gone from search', function () {",
+              "    pm.response.to.have.status(200);",
+              "    var data = pm.response.json();",
+              "    pm.expect(data.total).to.eql(0);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "11 - Admin: Trigger Reindex & Alias Swap",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"targetIndex\": \"products-v2\",\n  \"batchSize\": 500,\n  \"switchAlias\": true\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/admin/reindex",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "admin", "reindex"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Reindexing success', function () {",
+              "    pm.response.to.have.status(200);",
+              "    var data = pm.response.json();",
+              "    pm.expect(data.status).to.eql('SUCCESS');",
+              "    pm.expect(data.targetIndex).to.eql('products-v2');",
+              "    pm.expect(data.aliasSwitched).to.be.true;",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "12 - Admin: Inspect DLT Messages",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/admin/dlt?limit=50",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "admin", "dlt"],
+          "query": [
+            {
+              "key": "limit",
+              "value": "50"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('DLT inspection returns array', function () {",
+              "    pm.response.to.have.status(200);",
+              "    pm.expect(pm.response.json()).to.be.an('array');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "13 - Admin: Replay DLT Messages",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"replayAll\": true\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/admin/dlt/replay",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "admin", "dlt", "replay"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('DLT replay executed', function () {",
+              "    pm.response.to.have.status(200);",
+              "    var data = pm.response.json();",
+              "    pm.expect(data.status).to.be.oneOf(['SUCCESS', 'NO_MESSAGES']);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "14 - Metrics: CDC Replication Lag",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/actuator/metrics/products.cdc.lag",
+          "host": ["{{baseUrl}}"],
+          "path": ["actuator", "metrics", "products.cdc.lag"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('CDC Lag metric exists', function () {",
+              "    pm.response.to.have.status(200);",
+              "    pm.expect(pm.response.json().name).to.eql('products.cdc.lag');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "15 - Metrics: Search Duration",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/actuator/metrics/products.search.duration",
+          "host": ["{{baseUrl}}"],
+          "path": ["actuator", "metrics", "products.search.duration"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Search duration metric exists', function () {",
+              "    pm.response.to.have.status(200);",
+              "    pm.expect(pm.response.json().name).to.eql('products.search.duration');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    }
+  ]
+}
